@@ -16,10 +16,14 @@ limitations under the License.
 package cmd
 
 import (
+	"context"
 	"fmt"
+	"github.com/kmdkuk/cricli/log"
+	"google.golang.org/grpc"
 
 	"github.com/kmdkuk/cricli/version"
 	"github.com/spf13/cobra"
+	runtimeapi "k8s.io/cri-api/pkg/apis/runtime/v1alpha2"
 )
 
 // versionCmd represents the version command
@@ -32,9 +36,7 @@ and usage of using your command. For example:
 Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
-	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("version: %s-%s (%s)\n", version.Version, version.Revision, version.BuildDate)
-	},
+	Run: Version,
 }
 
 func init() {
@@ -49,4 +51,25 @@ func init() {
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
 	// versionCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+}
+
+func Version(_ *cobra.Command, _ []string) {
+	fmt.Printf("version: %s-%s (%s)\n", version.Version, version.Revision, version.BuildDate)
+	conn, err := grpc.Dial("127.0.0.1:19003", grpc.WithInsecure())
+	if err != nil {
+		log.Fatal("client connection error:", err)
+	}
+	defer func() {
+		err := conn.Close()
+		if err != nil {
+			log.Error("err: ", err)
+		}
+	}()
+	client := runtimeapi.NewRuntimeServiceClient(conn)
+	message := &runtimeapi.VersionRequest{}
+	res, err := client.Version(context.TODO(), message)
+	if err != nil {
+		log.Fatalf("error:%#v \n", err)
+	}
+	fmt.Printf("result:%#v \n", res)
 }
